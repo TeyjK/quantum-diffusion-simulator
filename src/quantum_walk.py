@@ -1,11 +1,8 @@
-"""
-Quantum walk implementation using Qiskit
-"""
-
 import numpy as np
 from qiskit import QuantumCircuit 
 from qiskit.quantum_info import Statevector
 from typing import Tuple, Dict, Optional
+import networkx as nx
 
 
 def create_coin_operator(
@@ -46,17 +43,14 @@ def controlled_increment(
     if n == 0:
         return
     
-    # First bit: simple CNOT
     qc.cx(control, targets[0])
     
     # Subsequent bits: multi-controlled NOT
     for i in range(1, n):
-        # Control on: original control AND all previous target bits
         controls = [control] + targets[:i]
         if len(controls) == 2:
             qc.ccx(controls[0], controls[1], targets[i])
         else:
-            # For more than 2 controls, use mcx
             qc.mcx(controls, targets[i])
 
 
@@ -78,7 +72,6 @@ def controlled_decrement(
     if n == 0:
         return
     
-    # Decrement = flip all bits, increment, flip all bits
     for t in targets:
         qc.x(t)
     
@@ -104,11 +97,8 @@ def create_shift_operator(
         coin_qubit: Index of coin qubit
         position_qubits: List of position qubit indices
     """
-    # Shift right when coin=|1⟩
     controlled_increment(qc, coin_qubit, position_qubits)
     
-    # Shift left when coin=|0⟩
-    # Use X gate to flip coin for control
     qc.x(coin_qubit)
     controlled_decrement(qc, coin_qubit, position_qubits)
     qc.x(coin_qubit)
@@ -132,52 +122,87 @@ def quantum_walk_1d(
     Returns:
         Tuple of (quantum_circuit, final_statevector)
     """
-    # Calculate required qubits
+    
     n_position_qubits = int(np.ceil(np.log2(num_nodes)))
     
-    # Adjust num_nodes to be power of 2
     actual_num_nodes = 2 ** n_position_qubits
     if actual_num_nodes != num_nodes:
         print(f"Note: Adjusting num_nodes from {num_nodes} to {actual_num_nodes} (power of 2)")
         num_nodes = actual_num_nodes
     
-    # Set default starting position to center
     if start_position is None:
         start_position = num_nodes // 2
     
-    # Create circuit: 1 coin qubit + n position qubits
     total_qubits = 1 + n_position_qubits
     qc = QuantumCircuit(total_qubits)
     
     coin_qubit = 0
     position_qubits = list(range(1, total_qubits))
     
-    # Initialize walker at start_position
-    # Convert position to binary and set corresponding qubits
     start_binary = format(start_position, f'0{n_position_qubits}b')
     for i, bit in enumerate(start_binary):
         if bit == '1':
             qc.x(position_qubits[i])
     
-    # Initialize coin in equal superposition
     qc.h(coin_qubit)
     
     qc.barrier(label='Init')
     
-    # Apply walk steps
     for step in range(steps):
-        # Step 1: Coin flip
         create_coin_operator(qc, coin_qubit, coin_bias)
-        
-        # Step 2: Conditional shift
         create_shift_operator(qc, coin_qubit, position_qubits)
-        
         qc.barrier(label=f'Step{step+1}')
     
-    # Get final statevector
     state = Statevector.from_instruction(qc)
     
     return qc, state
+
+
+def quantum_walk_graph(
+    G: nx.Graph,
+    steps: int = 20,
+    delta_t: float = 0.1,
+    start_node: int = 0
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Simulate a continuous-time quantum walk on an arbitrary graph using its adjacency matrix.
+    
+    Args:
+        G: networkx Graph (any topology)
+        steps: number of discrete time steps to simulate
+        delta_t: time step size
+        start_node: index of starting node
+        
+    Returns:
+        Tuple (prob_history, adjacency_matrix)
+            prob_history: array of shape (steps+1, num_nodes)
+            adjacency_matrix: numpy array of graph adjacency
+    """
+    num_nodes = len(G.nodes)
+    A = nx.to_numpy_array(G)
+    
+    # Define the Hamiltonian as the adjacency matrix (could also use Laplacian)
+    H = A
+
+    # Compute the time evolution operator U = exp(-i * H * t)
+    def time_evolution_operator(t):
+        return scipy.linalg.expm(-1j * H * t)
+
+    # Initial state localized at start_node
+    psi0 = np.zeros(num_nodes, dtype=complex)
+    psi0[start_node] = 1.0
+
+    # Track probabilities over time
+    prob_history = np.zeros((steps + 1, num_nodes))
+    prob_history[0] = np.abs(psi0) ** 2
+
+    for t_step in range(1, steps + 1):
+        t = t_step * delta_t
+        U = time_evolution_operator(t)
+        psi_t = U @ psi0
+        prob_history[t_step] = np.abs(psi_t) ** 2
+
+    return prob_history, A
 
 
 def extract_position_probabilities(
@@ -194,22 +219,16 @@ def extract_position_probabilities(
     Returns:
         Array of position probabilities
     """
-    # Get probability dictionary
+    
     probs_dict = state.probabilities_dict()
     
-    # Number of positions
     num_positions = 2 ** n_position_qubits
     position_probs = np.zeros(num_positions)
     
-    # Sum probabilities over coin states
     for state_str, prob in probs_dict.items():
-        # State string format: 'position_bits coin_bit'
-        # Reverse to get correct bit order
         state_bits = state_str[::-1]
-        
-        # Extract position bits (all except coin bit)
         position_bits = state_bits[1:]  # Skip coin bit
-        position_index = int(position_bits[::-1], 2)  # Reverse back
+        position_index = int(position_bits[::-1], 2)
         
         position_probs[position_index] += prob
     
@@ -235,23 +254,21 @@ def quantum_walk_evolution(
         Array of shape (steps+1, num_nodes) with probability history
     """
     n_position_qubits = int(np.ceil(np.log2(num_nodes)))
-    num_nodes = 2 ** n_position_qubits  # Adjust to power of 2
+    num_nodes = 2 ** n_position_qubits
     
     if start_position is None:
         start_position = num_nodes // 2
     
     history = []
     
-    # Initial state
     initial_probs = np.zeros(num_nodes)
     initial_probs[start_position] = 1.0
     history.append(initial_probs)
     
-    # Run walk for each step and record
     for step in range(1, steps + 1):
         qc, state = quantum_walk_1d(num_nodes, step, start_position, coin_bias)
         probs = extract_position_probabilities(state, n_position_qubits)
-        alpha = 0.98  # keep 98% of coherence, 2% uniform mixing
+        alpha = 0.98
         uniform = np.ones_like(probs) / len(probs)
         probs = alpha * probs + (1 - alpha) * uniform
         history.append(probs)
@@ -279,7 +296,6 @@ def run_quantum_simulation(
     """
     history = quantum_walk_evolution(num_nodes, steps, start_position, coin_bias)
     
-    # Get final circuit for visualization
     final_circuit, _ = quantum_walk_1d(num_nodes, steps, start_position, coin_bias)
     
     metadata = {
@@ -297,9 +313,43 @@ def run_quantum_simulation(
     return history, final_circuit, metadata
 
 
-# Example usage and testing
+def run_quantum_simulation_random(
+    num_nodes: int = 8,
+    steps: int = 10,
+    start_position: Optional[int] = None,
+    coin_bias: float = np.pi / 4
+) -> Tuple[np.ndarray, QuantumCircuit, dict]:
+    """
+    Run quantum walk and return comprehensive results.
+    
+    Args:
+        num_nodes: Number of positions
+        steps: Number of walk steps
+        start_position: Initial position
+        coin_bias: Coin operator bias
+        
+    Returns:
+        Tuple of (probability_history, final_circuit, metadata)
+    """
+    history = quantum_walk_evolution(num_nodes, steps, start_position, coin_bias)
+    
+    final_circuit, _ = quantum_walk_1d(num_nodes, steps, start_position, coin_bias)
+    
+    metadata = {
+        'method': 'quantum_walk',
+        'num_nodes': num_nodes,
+        'num_steps': steps,
+        'start_position': start_position if start_position else num_nodes // 2,
+        'coin_bias': coin_bias,
+        'num_qubits': final_circuit.num_qubits,
+        'circuit_depth': final_circuit.depth(),
+        'final_distribution': history[-1],
+        'max_probability_node': np.argmax(history[-1])
+    }
+    
+    return history, final_circuit, metadata
+
 if __name__ == "__main__":
-    # Test quantum walk
     print("Testing 1D Quantum Walk")
     print("=" * 50)
     

@@ -1,7 +1,3 @@
-"""
-Quantitative metrics for comparing classical and quantum walks
-"""
-
 import numpy as np
 from typing import Dict, List, Tuple
 from scipy.stats import entropy as scipy_entropy
@@ -20,7 +16,6 @@ def compute_entropy(prob_distribution: np.ndarray) -> float:
     Returns:
         Shannon entropy value
     """
-    # Filter out zero probabilities to avoid log(0)
     probs = prob_distribution[prob_distribution > 1e-10]
     
     if len(probs) == 0:
@@ -138,7 +133,7 @@ def compute_kl_divergence(
     Returns:
         KL divergence
     """
-    # Add small epsilon to avoid division by zero
+    
     epsilon = 1e-10
     dist1_safe = np.clip(dist1, epsilon, 1.0)
     dist2_safe = np.clip(dist2, epsilon, 1.0)
@@ -191,20 +186,17 @@ def compare_walks(
     Returns:
         Dictionary with comparison metrics
     """
-    # Compute metrics for both
+    
     classical_metrics = analyze_distribution_history(classical_history)
     quantum_metrics = analyze_distribution_history(quantum_history)
     
-    # Final state comparison
     final_classical = classical_history[-1]
     final_quantum = quantum_history[-1]
     
-    # Compute differences
     comparison = {
         'classical_metrics': classical_metrics,
         'quantum_metrics': quantum_metrics,
         
-        # Final state comparisons
         'final_entropy_difference': (
             quantum_metrics['entropy'][-1] - classical_metrics['entropy'][-1]
         ),
@@ -215,7 +207,6 @@ def compare_walks(
             final_quantum, final_classical
         ),
         
-        # Rate of spreading
         'classical_entropy_growth': (
             classical_metrics['entropy'][-1] - classical_metrics['entropy'][0]
         ),
@@ -223,7 +214,6 @@ def compare_walks(
             quantum_metrics['entropy'][-1] - quantum_metrics['entropy'][0]
         ),
         
-        # Steps to reach 50% coverage
         'classical_steps_to_50_coverage': _steps_to_threshold(
             classical_metrics['coverage'], 0.5
         ),
@@ -240,7 +230,7 @@ def _steps_to_threshold(metric_series: List[float], threshold: float) -> int:
     for step, value in enumerate(metric_series):
         if value >= threshold:
             return step
-    return len(metric_series)  # Never reached
+    return len(metric_series)
 
 
 def compute_interference_visibility(
@@ -262,7 +252,6 @@ def compute_interference_visibility(
     final_quantum = quantum_history[-1]
     final_classical = classical_history[-1]
     
-    # Use total variation distance as visibility measure
     visibility = compute_total_variation_distance(final_quantum, final_classical)
     
     return visibility
@@ -279,11 +268,9 @@ def generate_summary_statistics(comparison: Dict) -> str:
         Formatted string with key findings
     """
     summary = []
-    summary.append("=" * 60)
-    summary.append("QUANTUM vs CLASSICAL WALK COMPARISON")
-    summary.append("=" * 60)
+    summary.append("Quantum vs Classical")
     
-    # Coverage comparison
+    # Coverage
     classical_50_cov = comparison['classical_steps_to_50_coverage']
     quantum_50_cov = comparison['quantum_steps_to_50_coverage']
     
@@ -293,34 +280,20 @@ def generate_summary_statistics(comparison: Dict) -> str:
         summary.append(f"  Classical: {classical_50_cov} steps")
         summary.append(f"  Quantum:   {quantum_50_cov} steps")
     else:
-        summary.append(f"\n• Coverage rates similar")
+        summary.append(f"\nCoverage rates similar")
     
-    # Entropy comparison
+    # Entropy
     entropy_diff = comparison['final_entropy_difference']
-    summary.append(f"\n✓ Final entropy difference: {entropy_diff:+.3f}")
-    summary.append(f"  Higher entropy = more spread out distribution")
+    summary.append(f"\nFinal entropy difference: {entropy_diff:+.3f}")
     
     # Distribution difference
     tv_dist = comparison['final_tv_distance']
-    summary.append(f"\n✓ Total variation distance: {tv_dist:.3f}")
-    summary.append(f"  (0 = identical, 1 = completely different)")
-    
-    # Interference signature
-    if tv_dist > 0.3:
-        summary.append(f"\n🎯 Strong quantum interference signature detected!")
-    elif tv_dist > 0.1:
-        summary.append(f"\n→ Moderate quantum effects observed")
-    else:
-        summary.append(f"\n→ Weak quantum signature (need more steps)")
-    
-    summary.append("\n" + "=" * 60)
+    summary.append(f"\nTotal variation distance: {tv_dist:.3f}")
     
     return "\n".join(summary)
 
 
-# Example usage
 if __name__ == "__main__":
-    # Test with example distributions
     uniform = np.ones(8) / 8
     peaked = np.array([0.0, 0.1, 0.4, 0.4, 0.1, 0.0, 0.0, 0.0])
     

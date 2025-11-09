@@ -1,7 +1,3 @@
-"""
-Visualization functions for quantum walk analysis
-"""
-
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -10,7 +6,6 @@ import networkx as nx
 from typing import Optional, Tuple, Dict
 import seaborn as sns
 
-# Set style
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
@@ -43,13 +38,10 @@ def plot_network(
     else:
         fig = ax.get_figure()
     
-    # Layout
     pos = nx.spring_layout(G, seed=42)
     
-    # Draw network
     nx.draw_networkx_edges(G, pos, ax=ax, alpha=0.3, width=2)
     
-    # Draw nodes with probability colors
     nodes = nx.draw_networkx_nodes(
         G, pos, ax=ax,
         node_color=probabilities,
@@ -60,14 +52,12 @@ def plot_network(
         edgecolors='black',
         linewidths=2
     )
-    
-    # Labels
+
     nx.draw_networkx_labels(G, pos, ax=ax, font_size=12, font_weight='bold')
     
     ax.set_title(title, fontsize=14, fontweight='bold')
     ax.axis('off')
     
-    # Colorbar
     plt.colorbar(nodes, ax=ax, label='Probability')
     
     return fig
@@ -80,7 +70,7 @@ def plot_probability_bars(
     figsize: Tuple[int, int] = (14, 5)
 ) -> plt.Figure:
     """
-    Side-by-side bar chart comparison of probability distributions.
+    Side-by-side comparison of probability distributions.
     
     Args:
         classical_probs: Classical probabilities
@@ -123,7 +113,7 @@ def animate_diffusion(
     interval: int = 500
 ) -> animation.FuncAnimation:
     """
-    Create animated comparison of classical vs quantum diffusion.
+    Animation of classical vs quantum diffusion.
     
     Args:
         classical_history: Array of shape (steps, nodes)
@@ -136,11 +126,8 @@ def animate_diffusion(
         Animation object
     """
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
-    
-    # Layout (fixed for all frames)
     pos = nx.spring_layout(G, seed=42)
     
-    # Initialize empty plots
     nodes1 = None
     nodes2 = None
     
@@ -259,7 +246,7 @@ def create_heatmap_comparison(
     figsize: Tuple[int, int] = (14, 6)
 ) -> plt.Figure:
     """
-    Create heatmaps showing evolution of probability over time.
+    Heatmaps showing evolution of probability over time.
     
     Args:
         classical_history: Classical probability history
@@ -330,7 +317,6 @@ def create_summary_figure(
     G: nx.Graph,
     classical_metrics: Dict,
     quantum_metrics: Dict,
-    circuit: Optional[any] = None,
     figsize: Tuple[int, int] = (18, 10)
 ) -> plt.Figure:
     """
@@ -402,32 +388,14 @@ def create_summary_figure(
     ax6.set_title('Probability Difference\n(Quantum - Classical)', fontweight='bold')
     plt.colorbar(im, ax=ax6)
     
-    # Bottom row: Circuit and summary
-    if circuit is not None:
-        ax7 = fig.add_subplot(gs[2, :2])
-        try:
-            circuit.draw('mpl', ax=ax7)
-            ax7.set_title('Quantum Circuit', fontweight='bold')
-        except:
-            ax7.text(0.5, 0.5, 'Circuit visualization unavailable',
-                    ha='center', va='center', fontsize=12)
-            ax7.axis('off')
-    else:
-        ax7 = fig.add_subplot(gs[2, :2])
-        ax7.axis('off')
-    
-    # Key findings text
     ax8 = fig.add_subplot(gs[2, 2])
     ax8.axis('off')
     
-    # Calculate key stats
     final_tv = np.sum(np.abs(quantum_history[-1] - classical_history[-1])) / 2
     q_max = np.max(quantum_history[-1])
     c_max = np.max(classical_history[-1])
     
     findings_text = f"""
-    KEY FINDINGS
-    {'='*30}
     
     Final TV Distance: {final_tv:.3f}
     
@@ -453,7 +421,6 @@ def create_summary_figure(
     return fig
 
 
-# Quick plotting functions for notebook use
 def quick_comparison(classical_history, quantum_history, step=-1):
     """Quick side-by-side comparison at specific step."""
     fig = plot_probability_bars(

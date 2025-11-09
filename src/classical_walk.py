@@ -1,7 +1,3 @@
-"""
-Classical random walk implementation for baseline comparison
-"""
-
 import numpy as np
 import networkx as nx
 from typing import Tuple, Optional
@@ -31,23 +27,16 @@ def classical_diffusion(
     """
     n = G.number_of_nodes()
     
-    # Get transition matrix
     P = get_transition_matrix(G)
     
-    # Initialize probability distribution
     prob = np.zeros(n)
     prob[start_node] = 1.0
     
-    # Store history
     history = [prob.copy()]
     
-    # Evolve the distribution
     for step in range(steps):
         prob = P @ prob
-        
-        # Normalize to handle numerical errors
-        prob = prob / np.sum(prob)
-        
+        prob = prob / np.sum(prob)        
         history.append(prob.copy())
     
     return np.array(history)
@@ -77,17 +66,14 @@ def classical_diffusion_with_damping(
     n = G.number_of_nodes()
     P = get_transition_matrix(G)
     
-    # Damped transition matrix
     # P_damped = damping * P + (1-damping) * (1/n) * ones_matrix
     teleport = (1 - damping) / n * np.ones((n, n))
     P_damped = damping * P + teleport
     
-    # Initialize
     prob = np.zeros(n)
     prob[start_node] = 1.0
     history = [prob.copy()]
     
-    # Evolve
     for step in range(steps):
         prob = P_damped @ prob
         prob = prob / np.sum(prob)
@@ -186,18 +172,14 @@ def mixing_time_classical(
     history = classical_diffusion(G, max_steps, start_node)
     
     for step, prob_dist in enumerate(history):
-        # Total variation distance from uniform
         tv_distance = 0.5 * np.sum(np.abs(prob_dist - uniform))
-        
         if tv_distance <= epsilon:
             return step
     
     return max_steps
 
 
-# Example usage and testing
 if __name__ == "__main__":
-    # Test with a simple ring graph
     from .networks import create_ring_graph
     
     G = create_ring_graph(8)

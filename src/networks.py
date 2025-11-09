@@ -2,10 +2,6 @@ import networkx as nx
 import numpy as np
 from typing import Dict, Tuple
 
-"""
-Network topology creation and management functions
-"""
-
 def create_ring_graph(n: int = 8) -> nx.Graph:
     """
     Create a ring (cycle) graph where each node connects to 2 neighbors.
@@ -31,7 +27,7 @@ def create_star_graph(n: int = 8) -> nx.Graph:
     Returns:
         NetworkX graph object
     """
-    G = nx.star_graph(n - 1)  # star_graph(k) creates k+1 nodes
+    G = nx.star_graph(n - 1)
     G.name = f"Star Graph (n={n})"
     return G
 
@@ -50,9 +46,7 @@ def create_random_graph(n: int = 8, p: float = 0.3, seed: int = 42) -> nx.Graph:
     """
     G = nx.erdos_renyi_graph(n, p, seed=seed)
     
-    # Ensure connectivity
     if not nx.is_connected(G):
-        # Add edges to make connected
         components = list(nx.connected_components(G))
         for i in range(len(components) - 1):
             node1 = list(components[i])[0]
@@ -89,10 +83,7 @@ def get_transition_matrix(G: nx.Graph) -> np.ndarray:
     """
     A = get_adjacency_matrix(G)
     
-    # Degree matrix (diagonal with node degrees)
     degrees = A.sum(axis=1)
-    
-    # Avoid division by zero for isolated nodes
     degrees[degrees == 0] = 1
     
     # Create stochastic matrix: P[i,j] = A[i,j] / degree(i)
@@ -136,8 +127,6 @@ def map_to_line_positions(G: nx.Graph) -> Dict[int, int]:
     n = G.number_of_nodes()
     return {node: idx for idx, node in enumerate(sorted(G.nodes()))}
 
-
-# Preset network configurations for experiments
 PRESET_NETWORKS = {
     'ring_8': lambda: create_ring_graph(8),
     'star_8': lambda: create_star_graph(8),
